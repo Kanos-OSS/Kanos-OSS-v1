@@ -49,13 +49,18 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: "50mb" }));
 
+// Use a Postgres-backed session store when a database is configured;
+// otherwise fall back to express-session's in-memory store (DB-free mode).
 const PgStore = connectPgSimple(session);
-app.use(
-  session({
-    store: new PgStore({
+const sessionStore = process.env.DATABASE_URL
+  ? new PgStore({
       conString: process.env.DATABASE_URL,
       createTableIfMissing: true,
-    }),
+    })
+  : undefined;
+app.use(
+  session({
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || "kanos-dev-secret",
     resave: false,
     saveUninitialized: false,
@@ -156,8 +161,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const { seedDatabase } = await import("./seed");
-  await seedDatabase().catch((e) => console.error("Seed failed:", e));
+  if (process.env.DATABASE_URL) {
+    const { seedDatabase } = await import("./seed");
+    await seedDatabase().catch((e) => console.error("Seed failed:", e));
+  }
 
   // Health check
   app.get("/health", (_req, res) => {
@@ -177,7 +184,7 @@ app.use((req, res, next) => {
           "Run a pricing analysis (API key auth: 'Authorization: Bearer <key>'). Body: { productInput, businessType?, businessLocation?, currentPrice? }",
         "GET /health": "Health check",
       },
-      auth: "Create an API key with `npm run create-api-key`, then send it as a Bearer token.",
+      auth: "Send an API key as a Bearer token. Set a static API_KEY in the environment, or (with a database) mint one via `npm run create-api-key`.",
     };
 
     if ((req.headers.accept || "").includes("text/html")) {

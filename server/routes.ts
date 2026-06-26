@@ -33,6 +33,11 @@ async function requireApiKey(req: Request, res: Response, next: NextFunction) {
   const match = header.match(/^Bearer\s+(.+)$/i);
   const key = match ? match[1].trim() : (req.headers["x-api-key"] as string || "").trim();
   if (!key) return res.status(401).json({ error: { message: "Missing API key. Provide it as 'Authorization: Bearer <key>'." } });
+  // Static API key (no database required). Set API_KEY in the environment.
+  if (process.env.API_KEY && key === process.env.API_KEY) {
+    (req as any).apiUserId = 1;
+    return next();
+  }
   const apiKey = await storage.getApiKeyByKey(key);
   if (!apiKey) return res.status(401).json({ error: { message: "Invalid API key." } });
   storage.touchApiKey(apiKey.id).catch(() => {});
@@ -628,7 +633,8 @@ export async function registerRoutes(
   });
 
   registerRunAnalysis(runAnalysis);
-  startScheduler();
+  // The scheduler relies on persisted schedules; only run it with a database.
+  if (process.env.DATABASE_URL) startScheduler();
 
   return httpServer;
 }

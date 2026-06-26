@@ -38,9 +38,33 @@ scripts/
   create-api-key.ts Mint an API key without the web UI
 ```
 
-## Quick start (Docker)
+## Do I need a database?
 
-The fastest path - brings up Postgres and the server together.
+No. The pricing engine is the AI layer, not the database.
+
+- **Without `DATABASE_URL`** (the simple path): the server runs with an in-memory store. The stateless pricing API works with just `MINIMAX_KEY` and a static `API_KEY`. State (history, schedules, chat) is kept in memory and lost on restart.
+- **With `DATABASE_URL`**: you get persistence: saved analysis history, scheduled monitoring, report chat, minted API keys, and the Google OAuth login flow.
+
+Pick whichever fits. The endpoints are identical.
+
+## Quick start (no database)
+
+Requires Node 20+ only.
+
+```bash
+npm install
+cp .env.example .env     # set MINIMAX_KEY and API_KEY (any secret you choose)
+npm run dev              # server on http://localhost:15000
+
+curl -X POST http://localhost:15000/api/agent/analyze \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"productInput":"Premium ceramic coffee mug","currentPrice":18.99}'
+```
+
+## Quick start (Docker, with Postgres)
+
+Brings up Postgres and the server together for the full persistent app.
 
 ```bash
 cp .env.example .env
@@ -60,7 +84,7 @@ curl -X POST http://localhost:15000/api/agent/analyze \
   -d '{"productInput":"Premium ceramic coffee mug","currentPrice":18.99}'
 ```
 
-## Quick start (local Node)
+## Quick start (local Node, with Postgres)
 
 Requires Node 20+ and a reachable PostgreSQL database.
 
@@ -78,8 +102,9 @@ All configuration is via environment variables (see [`.env.example`](.env.exampl
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | yes | PostgreSQL connection string |
 | `MINIMAX_KEY` | yes | API key for the OpenAI-compatible text model (OpenRouter by default) |
+| `API_KEY` | for headless use | Static bearer token for `POST /api/agent/analyze`; required when running DB-free |
+| `DATABASE_URL` | no | PostgreSQL connection string. Omit to run with an in-memory store |
 | `PORT` | no | Listen port (default `15000`) |
 | `SESSION_SECRET` | no | Cookie signing secret (set in production) |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | no | Enable the browser Google login flow |
