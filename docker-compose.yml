@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kanos
+      POSTGRES_PASSWORD: kanos
+      POSTGRES_DB: kanos
+    ports:
+      - "5432:5432"
+    volumes:
+      - kanos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kanos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://kanos:kanos@db:5432/kanos
+      MINIMAX_KEY: ${MINIMAX_KEY:-}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
+      PORT: "15000"
+    ports:
+      - "15000:15000"
+
+volumes:
+  kanos_pgdata:
